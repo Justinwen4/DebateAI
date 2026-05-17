@@ -16,107 +16,121 @@ export default function RotatingQACard({ items, intervalMs = 8000 }: RotatingQAC
   const safeItems = useMemo(() => (items.length > 0 ? items : [{ question: "", answer: "" }]), [items]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const setCardIndex = (index: number) => {
+    if (isAnimating || index === activeIndex) return;
+    setIsAnimating(true);
     setIsVisible(false);
     window.setTimeout(() => {
       setActiveIndex(index);
       setIsVisible(true);
-    }, 120);
+      setIsAnimating(false);
+    }, 180);
+  };
+
+  const goToPrevious = () => {
+    const nextIndex = (activeIndex - 1 + safeItems.length) % safeItems.length;
+    setCardIndex(nextIndex);
+  };
+
+  const goToNext = () => {
+    const nextIndex = (activeIndex + 1) % safeItems.length;
+    setCardIndex(nextIndex);
   };
 
   useEffect(() => {
-    if (safeItems.length <= 1 || isPaused) return;
-
-    let fadeTimer: number | undefined;
+    if (safeItems.length <= 1) return;
     const cycleTimer = window.setInterval(() => {
-      setIsVisible(false);
-      fadeTimer = window.setTimeout(() => {
-        setActiveIndex((current) => (current + 1) % safeItems.length);
-        setIsVisible(true);
-      }, 180);
+      setCardIndex((activeIndex + 1) % safeItems.length);
     }, intervalMs);
 
-    return () => {
-      window.clearInterval(cycleTimer);
-      if (fadeTimer) {
-        window.clearTimeout(fadeTimer);
-      }
-    };
-  }, [intervalMs, isPaused, safeItems.length]);
+    return () => window.clearInterval(cycleTimer);
+  }, [activeIndex, intervalMs, safeItems.length]);
 
   const item = safeItems[activeIndex];
 
   return (
-    <section className="rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-md)] sm:p-7">
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5">
-          {safeItems.map((_, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => {
-                setIsPaused(true);
-                setCardIndex(index);
-              }}
-              className={`h-8 min-w-8 rounded-lg border px-2 text-xs font-semibold transition-colors ${
-                activeIndex === index
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-background text-muted hover:bg-surface-hover"
-              }`}
-              aria-label={`Show sample ${index + 1}`}
-            >
-              {index + 1}
-            </button>
-          ))}
+    <section className="flex h-[540px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-lg)] ring-1 ring-foreground/5">
+      <div className="flex items-center justify-between border-b border-border bg-surface-hover/60 px-4 py-3">
+        <div className="flex gap-1.5">
+          <div className="h-2.5 w-2.5 rounded-full bg-border" />
+          <div className="h-2.5 w-2.5 rounded-full bg-border" />
+          <div className="h-2.5 w-2.5 rounded-full bg-border" />
         </div>
-        <button
-          type="button"
-          onClick={() => setIsPaused((value) => !value)}
-          className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:bg-surface-hover"
-        >
-          {isPaused ? "Resume" : "Pause"}
-        </button>
-      </div>
-
-      <p className="text-lg leading-snug text-foreground sm:text-xl">{item.question}</p>
-
-      <div
-        className={`mt-4 rounded-2xl border border-border-subtle bg-background px-4 py-3 text-sm leading-relaxed text-foreground/90 transition-opacity duration-300 sm:text-base ${
-          isVisible ? "qa-enter" : "qa-exit"
-        }`}
-      >
-        {item.answer}
-      </div>
-
-      <div className="mt-4 flex items-center gap-2">
-        {[1, 2, 3, 4, 5].map((rating) => (
-          <span
-            key={rating}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface text-sm font-medium text-muted"
-            aria-hidden
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={goToPrevious}
+            className="grid h-8 w-8 place-items-center rounded-md border border-border bg-background text-muted transition-colors hover:border-accent/40 hover:text-accent"
+            aria-label="Show previous sample response"
           >
-            {rating}
-          </span>
-        ))}
+            <span aria-hidden>&larr;</span>
+          </button>
+          <button
+            type="button"
+            onClick={goToNext}
+            className="grid h-8 w-8 place-items-center rounded-md border border-border bg-background text-muted transition-colors hover:border-accent/40 hover:text-accent"
+            aria-label="Show next sample response"
+          >
+            <span aria-hidden>&rarr;</span>
+          </button>
+        </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Notes (optional)"
-          readOnly
-          className="h-10 flex-1 rounded-xl border border-border bg-background px-3.5 text-sm text-muted outline-none"
-        />
-        <button
-          type="button"
-          disabled
-          className="h-10 rounded-xl bg-border px-5 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-80"
-        >
-          Send
-        </button>
-        <span className="text-sm font-medium text-foreground/80">Cancel</span>
+      <div className="flex h-full flex-col gap-4 bg-background p-5">
+        <div className="flex-1 space-y-4">
+          <p
+            className={`px-1 text-[14px] leading-snug text-foreground transition-all duration-300 ${
+              isVisible ? "qa-enter translate-x-0" : "qa-exit -translate-x-2"
+            }`}
+          >
+            {item.question}
+          </p>
+
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <p
+              className={`text-[13px] leading-relaxed text-foreground/90 transition-all duration-300 ${
+                isVisible ? "qa-enter translate-x-0" : "qa-exit -translate-x-2"
+              }`}
+            >
+              {item.answer}
+            </p>
+
+            <div className="mt-5 flex items-center gap-1.5">
+              {[1, 2, 3, 4, 5].map((rating) => (
+                <button
+                  key={rating}
+                  type="button"
+                  className="grid h-8 w-8 place-items-center rounded-md border border-border text-xs text-muted transition-colors hover:border-accent/40 hover:text-accent"
+                >
+                  {rating}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Notes (optional)"
+                readOnly
+                className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm text-muted outline-none"
+              />
+              <button
+                type="button"
+                disabled
+                className="h-11 rounded-md bg-border px-5 text-sm font-semibold text-background disabled:cursor-not-allowed"
+              >
+                Send
+              </button>
+              <span className="text-sm text-foreground/80">Cancel</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
+          Ask a debate question...
+        </div>
       </div>
     </section>
   );
