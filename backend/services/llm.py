@@ -25,9 +25,6 @@ MATCH THIS REGISTER EXACTLY:
 Q: Why does utilitarianism fail as a moral framework?
 A: Utilitarianism fails for three core reasons. First, demandingness: it requires sacrificing everything for the greater good, which makes morality psychologically unlivable. Second, the repugnant conclusion: maximizing total happiness justifies a massive population of barely happy people over a small, flourishing one. Third, the utility monster problem: one person with extreme capacity for pleasure could justify enslaving everyone else, proving util has no principled constraint on distribution.
 
-Q: Why can't the AFF weigh case against the K?
-A: The aff can't weigh case against the K because the K is procedural, similar to condo or disclosure. Theoretical practices, like those addressed in the K, are resolved before substantive impacts like extinction.
-
 Q: Why doesn't winning ethical consequences mean winning ethical representations?
 A: Winning ethical consequences doesn't mean winning ethical representations because of reverse causality. Ethical consequences focus on outcomes, while ethical representations are about the underlying justifications and motivations. For example, both antisemites and pro-Palestinians may oppose Israel, but their reasons differ significantly. This distinction shows that similar consequences can arise from vastly different ethical representations.
 
@@ -74,7 +71,7 @@ def generate_response(prompt: str, context: str = "", history: list[dict[str, st
     messages.append({"role": "user", "content": prompt})
 
     response = _get_client().chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=messages,
         temperature=0.5,
         max_tokens=700,
