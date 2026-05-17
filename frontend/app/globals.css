@@ -13,6 +13,7 @@
   --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-playfair-display);
 }
 
 @layer base {
@@ -88,4 +89,22 @@
 }
 .message-enter {
   animation: message-in 0.25s ease-out;
+}
+
+@keyframes qa-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.qa-enter {
+  opacity: 1;
+  animation: qa-fade-in 0.3s ease-out;
+}
+
+.qa-exit {
+  opacity: 0;
 }

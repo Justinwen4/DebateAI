@@ -74,7 +74,9 @@ export default function SignupPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-md)]">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Create account</h1>
+          <h1 className="font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight text-foreground">
+            Create account
+          </h1>
           <p className="mt-2 text-sm text-muted">Start using DebateAI in under a minute.</p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
