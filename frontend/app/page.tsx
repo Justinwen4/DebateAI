@@ -33,11 +33,6 @@ const valueProps = [
     heading: "Conceptual Grasp",
     body: "Moral philosophy, Kritiks, T/Theory - the technical vocabulary, not generic AI hand-waving.",
   },
-  {
-    label: "Use It For",
-    heading: "Cases, blocks, prep",
-    body: "Cut cards, write 2NR overviews, drill cross-ex, and pressure-test your case before the round, not during it.",
-  },
 ];
 
 export default function LandingPage() {
@@ -91,12 +86,6 @@ export default function LandingPage() {
             >
               Get early access
             </Link>
-            <a
-              href="#how-it-thinks"
-              className="rounded-xl border border-border bg-surface px-6 py-3 text-base font-semibold text-foreground transition-colors hover:bg-surface-hover"
-            >
-              See how it thinks
-            </a>
           </div>
         </div>
 
@@ -121,7 +110,7 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-6 py-16 md:py-24">
-        <div className="grid gap-14 md:grid-cols-3 md:gap-10">
+        <div className="grid gap-14 md:grid-cols-2 md:gap-10">
           {valueProps.map((section) => (
             <article key={section.heading} className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">{section.label}</p>
