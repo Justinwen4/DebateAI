@@ -128,7 +128,7 @@ export default function LandingPage() {
               <h3 className="font-[family-name:var(--font-display)] text-5xl leading-[0.95] tracking-tight text-foreground">
                 {section.heading}
               </h3>
-              <p className="max-w-md text-[1.65rem] leading-snug text-foreground/80">{section.body}</p>
+              <p className="max-w-md text-[1.1rem] leading-relaxed text-foreground/80 sm:text-[1.25rem]">{section.body}</p>
             </article>
           ))}
         </div>
