@@ -6,19 +6,19 @@ import RotatingQACard, { type SampleQA } from "@/app/components/RotatingQACard";
 
 const samplePairs: SampleQA[] = [
   {
-    question: "Why does 1NC theory outweigh?",
-    answer:
-      "1NC theory outweighs because it's lexically prior-any neg abuse is a reaction to aff abuse, making it justified. Additionally, 1AR theory can't set norms effectively since the neg only has one speech to develop their arguments, limiting their ability to fully engage.",
-  },
-  {
     question: "Why shouldn't we evaluate the plan text in a vacuum?",
     answer:
-      'We should not evaluate the plan text in a vacuum because it creates a moral hazard, allowing any aff to be topical just by mentioning "[topic]" in the plan text. This undermines debate by justifying affs from previous topics. It also forces the neg to rely on T and substance in the 2NR to hold the aff to a stable advocacy, making it nearly impossible for the neg to win.',
+      "Plan text in a vacuum creates a moral hazard: it allows any aff to be topical just by including the topic in the plan text. This justifies reading affs from previous topics, destroying debate, and forces every 2NR to be split between T and substance just to hold the aff to a stable advocacy. That sets the threshold for a negative win too high.",
   },
   {
     question: "Why are PICs good?",
     answer:
-      "PICs are good for three reasons. First, they enhance logic and clash by showing a part of the plan is flawed and should be excluded, preventing the aff from arbitrarily avoiding accountability for their proposal. Second, they preserve neg ground since the aff chooses the plan, and plan-focus PICs only challenge what the aff selected. Without PICs, counterplans would be impossible. Third, they improve education by mirroring real-world policymaking, where components of bills are often amended, fostering better clash and understanding.",
+      "PICs are good for three reasons. First, logic and clash: PICs show a part of the plan is flawed and should be excluded. Arbitrarily excluding legitimate neg is unpredictable and a slippery slope to excluding all counterplans. Second, neg flex: the aff chooses the plan and gets first and last speech, which is also terminal defense because we can only negate what the aff chooses to defend. Third, real world education: PICs mirror real-world policymaking, where bills are often amended, fostering better clash and understanding which is the only portable impact.",
+  },
+  {
+    question: "Why does 1NC theory outweigh?",
+    answer:
+      "1NC theory outweighs because it's lexically prior: any neg abuse is a reaction to aff abuse. Additionally, both sides have 2 speeches to rigorously test 1NC theory whereas the negative only has one speech to negate 1AR theory. That proves aff theory is structurally aff-biased, making it impossible to determine the legitimacy of their abuse story.",
   },
 ];
 

@@ -12,6 +12,7 @@ HASH_FILE = os.path.join(DB_DIR, ".dataset_hash")
 
 _client: chromadb.ClientAPI | None = None
 _collection: chromadb.Collection | None = None
+_last_mtime: float = 0.0
 
 
 def _get_client() -> chromadb.ClientAPI:
@@ -80,8 +81,21 @@ def seed_from_dataset() -> int:
     return len(ids)
 
 
+def _reseed_if_changed() -> None:
+    """Reseed Chroma if dataset.tutor.jsonl has been modified since last check."""
+    global _last_mtime
+    path = Path(DATASET_PATH)
+    if not path.exists():
+        return
+    mtime = path.stat().st_mtime
+    if mtime != _last_mtime:
+        seed_from_dataset()
+        _last_mtime = path.stat().st_mtime
+
+
 def retrieve(query: str, n_results: int = 3) -> str:
     """Return top-k debate analytics relevant to the query."""
+    _reseed_if_changed()
     col = _get_collection()
     if col.count() == 0:
         return ""
