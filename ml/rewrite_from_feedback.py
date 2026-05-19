@@ -26,8 +26,12 @@ Flags:
   --include-non-curation-eligible
                   Include rows not marked curation_eligible=true (legacy/backfill mode)
   --no-dedup      Append even if the prompt already exists in the dataset
+  --overwrite     Replace the output file instead of appending (for review_batch.jsonl)
   --output PATH   Append to this file instead of ml/dataset.tutor.jsonl
-  --model NAME    OpenAI model (default: gpt-4o)
+  --provider NAME openai | anthropic (default: openai)
+  --model NAME    Model id (default: gpt-4.1 for openai, claude-sonnet-4-6 for anthropic)
+  --copy-inputs-from PATH
+                  Reuse tagged inputs from another JSONL (side-by-side A/B; output only differs)
   --sleep S       Seconds between API calls (default: 0.2)
 """
 
@@ -36,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -43,6 +48,34 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from prompts import rewrite as _rewrite, add_tags as _add_tags
 
+
+
+def _bare_question(text: str) -> str:
+    text = text.strip()
+    if text.startswith("[") and "] " in text:
+        text = text.split("] ", 1)[1].strip()
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", "", text)
+    return " ".join(text.split())
+
+
+def _load_tagged_inputs(path: Path) -> dict[str, str]:
+    """Map bare question text -> full tagged input from a JSONL file."""
+    tagged: dict[str, str] = {}
+    if not path.exists():
+        raise SystemExit(f"--copy-inputs-from file not found: {path}")
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        inp = (row.get("input") or "").strip()
+        if inp:
+            tagged[_bare_question(inp)] = inp
+    return tagged
 
 
 def _existing_prompts(dataset_path: Path) -> set[str]:
@@ -70,12 +103,24 @@ def _existing_prompts(dataset_path: Path) -> set[str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Rewrite feedback rows and append to dataset")
     parser.add_argument("--output", type=Path, default=Path("ml/dataset.tutor.jsonl"))
-    parser.add_argument("--model", default="gpt-4o")
+    parser.add_argument("--provider", choices=("openai", "anthropic"), default="openai")
+    parser.add_argument("--model", default=None)
+    parser.add_argument(
+        "--copy-inputs-from",
+        type=Path,
+        default=None,
+        help="Reuse input tags from this JSONL so only outputs differ between runs",
+    )
     parser.add_argument("--max-score", type=int, default=4, help="Only process rows with rating <= N")
     parser.add_argument("--min-score", type=int, default=1, help="Only process rows with rating >= N")
     parser.add_argument("--limit", type=int, default=0, help="Max rows to process (0 = all)")
     parser.add_argument("--dry-run", action="store_true", help="Print rewrites; do not write to dataset")
     parser.add_argument("--no-dedup", action="store_true", help="Append even if prompt already exists in dataset")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace output file instead of appending (dedup still applies unless --no-dedup)",
+    )
     parser.add_argument(
         "--include-non-curation-eligible",
         action="store_true",
@@ -84,15 +129,35 @@ def main() -> None:
     parser.add_argument("--sleep", type=float, default=0.2)
     args = parser.parse_args()
 
-    for var in ("OPENAI_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"):
+    if args.provider == "openai":
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise SystemExit("OPENAI_API_KEY is required — source backend/.env first")
+    elif not os.environ.get("ANTHROPIC_API_KEY"):
+        raise SystemExit("ANTHROPIC_API_KEY is required — add to backend/.env")
+
+    for var in ("SUPABASE_URL", "SUPABASE_KEY"):
         if not os.environ.get(var):
             raise SystemExit(f"{var} is required — source backend/.env first")
 
-    from openai import OpenAI
+    if args.model is None:
+        args.model = "claude-sonnet-4-6" if args.provider == "anthropic" else "gpt-4.1"
+
     from supabase import create_client
 
-    openai = OpenAI()
+    if args.provider == "openai":
+        from openai import OpenAI
+
+        llm = OpenAI()
+    else:
+        from anthropic import Anthropic
+
+        llm = Anthropic()
+
     sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
+    tagged_inputs: dict[str, str] = {}
+    if args.copy_inputs_from:
+        tagged_inputs = _load_tagged_inputs(args.copy_inputs_from)
+        print(f"  Reusing {len(tagged_inputs)} tagged inputs from {args.copy_inputs_from}")
 
     # Fetch all feedback rows
     print("Fetching feedback rows from Supabase…")
@@ -145,13 +210,14 @@ def main() -> None:
     if args.limit:
         qualifying = qualifying[: args.limit]
 
-    print(f"  {len(qualifying)} rows to rewrite")
+    print(f"  {len(qualifying)} rows to rewrite ({args.provider}/{args.model})")
     if not qualifying:
         return
 
     if not args.dry_run:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        out_fh = args.output.open("a", encoding="utf-8")
+        mode = "w" if args.overwrite else "a"
+        out_fh = args.output.open(mode, encoding="utf-8")
     else:
         out_fh = None
 
@@ -167,11 +233,18 @@ def main() -> None:
             if notes:
                 print(f"  notes: {notes[:120]}")
 
-            # Step 1: rewrite the output
-            new_output = _rewrite(openai, args.model, prompt, bad_output, notes)
+            new_output = _rewrite(
+                llm, args.model, prompt, bad_output, notes, provider=args.provider
+            )
 
-            # Step 2: add bracket tags to the input
-            tagged_input = _add_tags(openai, args.model, prompt)
+            bare = _bare_question(prompt)
+            if bare in tagged_inputs:
+                tagged_input = tagged_inputs[bare]
+            elif args.copy_inputs_from:
+                tagged_input = _add_tags(llm, args.model, prompt, provider=args.provider)
+                print("  ! no matching input in --copy-inputs-from; tagged fresh")
+            else:
+                tagged_input = _add_tags(llm, args.model, prompt, provider=args.provider)
 
             entry = {
                 "input": tagged_input,
@@ -187,7 +260,7 @@ def main() -> None:
                 out_fh.write(line + "\n")
                 out_fh.flush()
                 written += 1
-                print(f"  → appended")
+                print(f"  → written")
 
             if args.sleep and i < len(qualifying) - 1:
                 time.sleep(args.sleep)
@@ -199,7 +272,8 @@ def main() -> None:
     if args.dry_run:
         print(f"\nDry run complete — {len(qualifying)} rows previewed, nothing written.")
     else:
-        print(f"\nDone. {written} rows appended to {args.output}")
+        verb = "written to" if args.overwrite else "appended to"
+        print(f"\nDone. {written} rows {verb} {args.output}")
 
 
 if __name__ == "__main__":

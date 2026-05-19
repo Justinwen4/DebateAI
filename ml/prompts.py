@@ -6,64 +6,42 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from llm_utils import chat_completion
+from llm_utils import anthropic_message, chat_completion
 
 
 REWRITE_SYSTEM = """\
-You are a debate coach rewriting a tutor chatbot's response to a student's debate question.
+You are a sharp debate coach rewriting a tutor chatbot's response to a student's debate question.
+The student already knows basic debate terms (1AC, K, condo, framework, perm, link, alt, 2NR, 1AR, etc.) — do NOT define them.
 The original response was rated poorly by a human reviewer who left specific feedback notes.
-Your job: produce an improved answer that addresses the reviewer's critique.
+Your job: produce an improved answer that addresses the reviewer's critique and matches the tutor register below.
 
-ANSWER-FIRST (most important):
-- The first sentence MUST directly answer the student's question, naming the actual subject.
-  Examples:
-    Q: "Why can't the AFF weigh case against the K?"
-    → "The aff can't weigh case against the K because theory resolves before substance — \
-the same reason 'extinction outweighs' doesn't beat condo."
-    Q: "Why should the neg go for condo in the 2NR?"
-    → "The neg should go for condo in the 2NR because …"
-- Do NOT open with abstract restatement like "This claim argues…", "The argument centers on…".
+ANSWER FORMAT:
+- The first sentence MUST directly answer the question. No preamble, no restating the question.
+- Tight prose, stop when the argument is complete. Never pad to fill space; never truncate a warrant to save it.
 
-VOICE:
-- Neutral assistant tone; talk like a debater, not an essayist.
-- Use debate shorthand naturally (K, 1NC, 2NR, condo, perm, T, NIB, PIC, RVI, link, alt, FW).
-- Refer to sides as "the aff" / "the neg". Contractions are fine.
-- Cut filler: no "it is important to note," "this highlights that," "ultimately," "thus."
+STYLE:
+- Use debate shorthand naturally (K, 1AR, 2NR, condo, perm, framework, link, alt).
+- No filler ("it is important to note," "ultimately," "this highlights," "in other words").
+- Every claim must have a MECHANISM or warrant, not just a label.
+- Each sentence should advance the argument. Prefer one linked warrant chain over parallel mini-essays on separate topics.
+- Do NOT invent specific author evidence or card names.
+- If context is missing, say what would depend on the round.
 
-LENGTH:
-- Target 3–5 sentences (≈50–90 words). Go up to ~120 words ONLY if multiple distinct
-  warrants are present. Never pad.
-
-SUBSTANCE:
-- Preserve every claim and warrant from the original that the reviewer did NOT criticise.
+REWRITE RULES:
 - Directly fix whatever the reviewer flagged — if they said "too vague", be specific;
   if they said "wrong side", correct it; if they said "missing X", add X.
-- Do NOT add new facts, studies, or authors that weren't in the original.
+- Address reviewer feedback by fixing and tightening, not by adding parallel sections. Remove repetition and weak sentences even if they were in the original, unless the reviewer praised them.
+- When the reviewer asks to “expand” on one point, expand only that point; do not lengthen the whole answer.
 
 Output ONLY the rewritten answer text. No preamble, no meta-commentary, no quotes.
 
-EXAMPLES OF GOOD FINISHED ANSWERS (study voice, length, answer-first structure):
+MATCH THIS REGISTER EXACTLY:
 
-Q: Why does utilitarianism fail as a moral framework?
-A: Utilitarianism fails for three core reasons. First, demandingness: it requires \
-sacrificing everything for the greater good, which makes morality psychologically \
-unlivable. Second, the repugnant conclusion: maximizing total happiness justifies a \
-massive population of barely happy people over a small, flourishing one. Third, the \
-utility monster problem: one person with extreme capacity for pleasure could justify \
-enslaving everyone else, proving util has no principled constraint on distribution.
+Q: Why shouldn't we evaluate the plan text in a vacuum?
+A: Plan text in a vacuum creates a moral hazard: it allows any aff to be topical just by including the topic in the plan text. This justifies reading affs from previous topics, destroying debate, and forces every 2NR to be split between T and substance just to hold the aff to a stable advocacy. That sets the threshold for a negative win too high.
 
-Q: Why can't the AFF weigh case against the K?
-A: The aff can't weigh case against the K because the K is procedural, similar to condo \
-or disclosure. Theoretical practices, like those addressed in the K, are resolved before \
-substantive impacts like extinction.
-
-Q: Why doesn't winning ethical consequences mean winning ethical representations?
-A: Winning ethical consequences doesn't mean winning ethical representations because of \
-reverse causality. Ethical consequences focus on outcomes, while ethical representations \
-are about the underlying justifications and motivations. For example, both antisemites and \
-pro-Palestinians may oppose Israel, but their reasons differ significantly. This \
-distinction shows that similar consequences can arise from vastly different ethical \
-representations.\
+Q: Why are PICs good?
+A: PICs are good for three reasons. First, logic and clash: PICs show a part of the plan is flawed and should be excluded. Arbitrarily excluding legitimate neg is unpredictable and a slippery slope to excluding all counterplans. Second, neg flex: the aff chooses the plan and gets first and last speech, which is also terminal defense because we can only negate what the aff chooses to defend. Third, real world education: PICs mirror real-world policymaking, where bills are often amended, fostering better clash and understanding which is the only portable impact.\
 """
 
 TAG_SYSTEM = """\
@@ -85,26 +63,40 @@ Tag rules:
 Preserve the original question text exactly after the bracket prefix; just prepend the tag.
 
 EXAMPLES:
-  Input:  Why does utilitarianism fail as a moral framework?
-  Output: [General · util] Why does utilitarianism fail as a moral framework?
+  Input:  Why shouldn't we evaluate the plan text in a vacuum?
+  Output: [General · T · plan text in a vacuum] Why shouldn't we evaluate the plan text in a vacuum?
 
-  Input:  Why can't the AFF weigh case against the K?
-  Output: [Neg · reps K] Why can't the AFF weigh case against the K?
+  Input:  Why are PICs good?
+  Output: [Neg · PICs good · 2NR] Why are PICs good?
 
-  Input:  Why doesn't winning ethical consequences mean winning ethical representations?
-  Output: [General · Kritik] Why doesn't winning ethical consequences mean winning ethical representations?
+  Input:  How should I structure my 1AR to the kritik?
+  Output: [Aff · Kritik · 1AR] How should I structure my 1AR to the kritik?
 
 Return ONLY the tagged question — no explanation, no JSON, no quotes.\
 """
 
 
-def rewrite(client, model: str, question: str, bad_output: str, notes: str) -> str:
-    """Rewrite a bad answer guided by reviewer notes."""
-    user_msg = (
+def _rewrite_user_msg(question: str, bad_output: str, notes: str) -> str:
+    return (
         f"STUDENT QUESTION: {question.strip()}\n\n"
         f"ORIGINAL (POOR) ANSWER:\n{bad_output.strip()}\n\n"
-        f"REVIEWER FEEDBACK (must address):\n{notes.strip() if notes.strip() else '(no specific notes — improve clarity and directness)'}"
+        f"REVIEWER FEEDBACK (must address):\n"
+        f"{notes.strip() if notes.strip() else '(no specific notes — improve clarity and directness)'}"
     )
+
+
+def rewrite(client, model: str, question: str, bad_output: str, notes: str, *, provider: str = "openai") -> str:
+    """Rewrite a bad answer guided by reviewer notes."""
+    user_msg = _rewrite_user_msg(question, bad_output, notes)
+    if provider == "anthropic":
+        return anthropic_message(
+            client,
+            model=model,
+            system=REWRITE_SYSTEM,
+            user=user_msg,
+            temperature=0.3,
+            max_tokens=500,
+        )
     r = chat_completion(
         client,
         model=model,
@@ -113,24 +105,34 @@ def rewrite(client, model: str, question: str, bad_output: str, notes: str) -> s
             {"role": "user", "content": user_msg},
         ],
         temperature=0.3,
-        max_tokens=260,
+        max_tokens=700,
     )
     return (r.choices[0].message.content or "").strip()
 
 
-def add_tags(client, model: str, question: str) -> str:
+def add_tags(client, model: str, question: str, *, provider: str = "openai") -> str:
     """Add bracket-style debate tags to a raw question."""
-    r = chat_completion(
-        client,
-        model=model,
-        messages=[
-            {"role": "system", "content": TAG_SYSTEM},
-            {"role": "user", "content": question.strip()},
-        ],
-        temperature=0.1,
-        max_tokens=120,
-    )
-    result = (r.choices[0].message.content or "").strip()
+    if provider == "anthropic":
+        result = anthropic_message(
+            client,
+            model=model,
+            system=TAG_SYSTEM,
+            user=question.strip(),
+            temperature=0.1,
+            max_tokens=120,
+        )
+    else:
+        r = chat_completion(
+            client,
+            model=model,
+            messages=[
+                {"role": "system", "content": TAG_SYSTEM},
+                {"role": "user", "content": question.strip()},
+            ],
+            temperature=0.1,
+            max_tokens=120,
+        )
+        result = (r.choices[0].message.content or "").strip()
     if not result.startswith("["):
         return question.strip()
     return result

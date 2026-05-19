@@ -16,7 +16,7 @@ STYLE:
 - Use debate shorthand naturally (K, 1AR, 2NR, condo, perm, framework, link, alt).
 - No filler ("it is important to note," "ultimately," "this highlights," "in other words").
 - Every claim must have a MECHANISM or warrant, not just a label.
-- Conclusions are derived, not asserted. The final sentence must name the consequence that follows from the mechanism — never a label like "this undermines debate," "outweighs on scope," or "fostering better clash." If the last sentence could be deleted without losing a warrant, rewrite it.
+- Each sentence should advance the argument. Prefer one linked warrant chain over parallel mini-essays on separate topics.
 - Do NOT invent specific author evidence or card names.
 - If context is missing, say what would depend on the round.
 
