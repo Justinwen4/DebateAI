@@ -30,8 +30,6 @@ Flags:
   --output PATH   Append to this file instead of ml/dataset.tutor.jsonl
   --provider NAME openai | anthropic (default: openai)
   --model NAME    Model id (default: gpt-4.1 for openai, claude-sonnet-4-6 for anthropic)
-  --copy-inputs-from PATH
-                  Reuse tagged inputs from another JSONL (side-by-side A/B; output only differs)
   --sleep S       Seconds between API calls (default: 0.2)
 """
 
@@ -46,7 +44,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from prompts import rewrite as _rewrite, add_tags as _add_tags
+from prompts import rewrite as _rewrite
 
 
 
@@ -58,24 +56,6 @@ def _bare_question(text: str) -> str:
     text = re.sub(r"[^\w\s]", "", text)
     return " ".join(text.split())
 
-
-def _load_tagged_inputs(path: Path) -> dict[str, str]:
-    """Map bare question text -> full tagged input from a JSONL file."""
-    tagged: dict[str, str] = {}
-    if not path.exists():
-        raise SystemExit(f"--copy-inputs-from file not found: {path}")
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            row = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        inp = (row.get("input") or "").strip()
-        if inp:
-            tagged[_bare_question(inp)] = inp
-    return tagged
 
 
 def _existing_prompts(dataset_path: Path) -> set[str]:
@@ -105,12 +85,6 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("ml/dataset.tutor.jsonl"))
     parser.add_argument("--provider", choices=("openai", "anthropic"), default="openai")
     parser.add_argument("--model", default=None)
-    parser.add_argument(
-        "--copy-inputs-from",
-        type=Path,
-        default=None,
-        help="Reuse input tags from this JSONL so only outputs differ between runs",
-    )
     parser.add_argument("--max-score", type=int, default=4, help="Only process rows with rating <= N")
     parser.add_argument("--min-score", type=int, default=1, help="Only process rows with rating >= N")
     parser.add_argument("--limit", type=int, default=0, help="Max rows to process (0 = all)")
@@ -154,11 +128,6 @@ def main() -> None:
         llm = Anthropic()
 
     sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
-    tagged_inputs: dict[str, str] = {}
-    if args.copy_inputs_from:
-        tagged_inputs = _load_tagged_inputs(args.copy_inputs_from)
-        print(f"  Reusing {len(tagged_inputs)} tagged inputs from {args.copy_inputs_from}")
-
     # Fetch all feedback rows
     print("Fetching feedback rows from Supabase…")
     query = (
@@ -237,24 +206,15 @@ def main() -> None:
                 llm, args.model, prompt, bad_output, notes, provider=args.provider
             )
 
-            bare = _bare_question(prompt)
-            if bare in tagged_inputs:
-                tagged_input = tagged_inputs[bare]
-            elif args.copy_inputs_from:
-                tagged_input = _add_tags(llm, args.model, prompt, provider=args.provider)
-                print("  ! no matching input in --copy-inputs-from; tagged fresh")
-            else:
-                tagged_input = _add_tags(llm, args.model, prompt, provider=args.provider)
-
             entry = {
-                "input": tagged_input,
+                "input": prompt,
                 "output": new_output,
                 "mode": "normal",
             }
             line = json.dumps(entry, ensure_ascii=False)
 
             if args.dry_run:
-                print(f"  input:    {tagged_input}")
+                print(f"  input:    {prompt}")
                 print(f"  output:   {new_output[:200]}{'…' if len(new_output) > 200 else ''}")
             else:
                 out_fh.write(line + "\n")

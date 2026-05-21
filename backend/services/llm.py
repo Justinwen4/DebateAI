@@ -1,20 +1,25 @@
 import os
 
-from openai import OpenAI
+from anthropic import Anthropic
 
-client: OpenAI | None = None
+client: Anthropic | None = None
 MAX_HISTORY_TURNS = 12
+MODEL = "claude-sonnet-4-6"
 
 SYSTEM_PROMPT = """
 You are a sharp debate coach / tutor. The student already knows basic debate terms (1AC, K, condo, framework, perm, link, alt, 2NR, 1AR, etc.) — do NOT define them.
 
 ANSWER FORMAT:
-- The first sentence MUST directly answer the question. No preamble, no restating the question.
-- Tight prose, stop when the argument is complete. Never pad to fill space; never truncate a warrant to save it.
+- The first sentence MUST directly answer the question — not set it up, not frame context. If you can delete the first sentence and the response still makes sense, it's preamble; cut it.
+- Tight prose, stop when the argument is complete. Never pad to fill space.
+- Before finalizing, evaluate the last sentence: if it restates the conclusion, summarizes what was already said, or just names the lesson without extending the warrant, delete it.
+- Keep responses under ~120 words unless absolutely necessary.
 
 STYLE:
 - Use debate shorthand naturally (K, 1AR, 2NR, condo, perm, framework, link, alt).
 - No filler ("it is important to note," "ultimately," "this highlights," "in other words").
+- Never use hollow intensifiers ("actually," "immediately," "fundamentally," "real and lasting"). Never use agent-bloat framing ("The framework therefore argues we should X") — collapse it to the action ("X").
+- Say "read" not "run" for presenting arguments ("read the K," "read framework," not "run the K"). "Framework" in K rounds refers to the evaluative meta-level debate, not a generic strategic block — be precise.
 - Every claim must have a MECHANISM or warrant, not just a label.
 - Each sentence should advance the argument. Prefer one linked warrant chain over parallel mini-essays on separate topics.
 - Do NOT invent specific author evidence or card names.
@@ -32,10 +37,10 @@ When optional examples are retrieved below, use them for topic coverage and accu
 """.strip()
 
 
-def _get_client() -> OpenAI:
+def _get_client() -> Anthropic:
     global client
     if client is None:
-        client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     return client
 
 
@@ -61,19 +66,22 @@ def _sanitize_history(history: list[dict[str, str]] | None) -> list[dict[str, st
 
 def generate_response(prompt: str, context: str = "", history: list[dict[str, str]] | None = None) -> str:
     """Generate a tutor-style response for the given debate question."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
+    system = SYSTEM_PROMPT
     if context:
-        ctx = "Reference examples (domain snippets — match substance, not performative tone):\n\n" + context
-        messages.append({"role": "system", "content": ctx})
+        system += (
+            "\n\nReference examples (domain snippets — match substance, not performative tone):\n\n"
+            + context
+        )
 
-    messages.extend(_sanitize_history(history))
+    messages = _sanitize_history(history)
     messages.append({"role": "user", "content": prompt})
 
-    response = _get_client().chat.completions.create(
-        model="gpt-4.1",
+    msg = _get_client().messages.create(
+        model=MODEL,
+        system=system,
         messages=messages,
         temperature=0.5,
-        max_tokens=700,
+        max_tokens=500,
     )
-    return response.choices[0].message.content.strip()
+    parts = [block.text for block in msg.content if block.type == "text"]
+    return "".join(parts).strip()
