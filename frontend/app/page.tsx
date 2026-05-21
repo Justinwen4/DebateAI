@@ -8,17 +8,17 @@ const samplePairs: SampleQA[] = [
   {
     question: "Why shouldn't we evaluate the plan text in a vacuum?",
     answer:
-      "Plan text in a vacuum creates a moral hazard: it allows any aff to be topical just by including the topic in the plan text. This justifies reading affs from previous topics, destroying debate, and forces every 2NR to be split between T and substance just to hold the aff to a stable advocacy. That sets the threshold for a negative win too high.",
+      "Plan text in a vacuum creates a moral hazard: it allows any aff to be topical just by including the topic in the plan text. That justifies reading affs from previous topics, destroying debate, and forces every 2NR to be split between T and substance just to hold the aff to a stable advocacy. That sets the threshold for a negative win too high.",
   },
   {
     question: "Why are PICs good?",
     answer:
-      "PICs are good for three reasons. First, logic and clash: PICs show a part of the plan is flawed and should be excluded. Arbitrarily excluding legitimate neg is unpredictable and a slippery slope to excluding all counterplans. Second, neg flex: the aff chooses the plan and gets first and last speech, which is also terminal defense because we can only negate what the aff chooses to defend. Third, real world education: PICs mirror real-world policymaking, where bills are often amended, fostering better clash and understanding which is the only portable impact.",
+      "PICs are good for three reasons. First, logic and clash: PICs show a part of the plan is flawed and should be excluded. Arbitrarily excluding legitimate neg offense is unpredictable and a slippery slope to excluding all counterplans. Second, neg flex: the aff chooses the plan and gets first and last speech advantage. That's also terminal defense because we can only negate what the aff chooses to defend. Third, real world education: PICs mirror real-world policymaking, where bills are often amended, fostering better clash and understanding which is the only portable impact.",
   },
   {
     question: "Why does 1NC theory outweigh?",
     answer:
-      "1NC theory outweighs because it's lexically prior: any neg abuse is a reaction to aff abuse. Additionally, both sides have 2 speeches to rigorously test 1NC theory whereas the negative only has one speech to negate 1AR theory. That proves aff theory is structurally aff-biased, making it impossible to determine the legitimacy of their abuse story.",
+      "1NC theory outweighs because it's lexically prior: any neg abuse is a reaction to aff abuse. Additionally, both sides have 2 speeches to rigorously test 1NC theory whereas the negative only has one speech to test 1AR theory. That proves 1AR theory is structurally aff-biased, making it impossible to assess the legitimacy of their abuse story.",
   },
 ];
 
