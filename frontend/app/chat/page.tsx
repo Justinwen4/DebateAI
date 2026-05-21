@@ -78,16 +78,11 @@ export default function ChatPage() {
 
     const list = (data ?? []) as ConversationSummary[];
     setConversations(list);
-    const firstConversationId = list[0]?.id ?? null;
-    setActiveConversationId(firstConversationId);
-    if (firstConversationId) {
-      await loadConversationMessages(firstConversationId);
-    } else {
-      setMessages([]);
-      setInput("");
-    }
+    setActiveConversationId(null);
+    setMessages([]);
+    setInput("");
     setLoadingConversations(false);
-  }, [loadConversationMessages, user]);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -251,6 +246,21 @@ export default function ChatPage() {
     [activeConversationId, loadConversationMessages],
   );
 
+  const handleDeleteConversation = useCallback(
+    async (conversationId: string) => {
+      const { error } = await supabase.from("conversations").delete().eq("id", conversationId);
+      if (error) return;
+
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(null);
+        setMessages([]);
+        setInput("");
+      }
+    },
+    [activeConversationId],
+  );
+
   const handleSignOut = useCallback(async () => {
     if (signingOut) return;
     setSigningOut(true);
@@ -285,6 +295,9 @@ export default function ChatPage() {
         activeConversationId={activeConversationId}
         onSelectConversation={(conversationId) => {
           void handleSelectConversation(conversationId);
+        }}
+        onDeleteConversation={(conversationId) => {
+          void handleDeleteConversation(conversationId);
         }}
         userEmail={user.email}
         onSignOut={handleSignOut}
